@@ -1,0 +1,134 @@
+{% extends "network/layout.html" %}
+
+{% block body %}
+    <script>
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length == 2) return parts.pop().split(';').shift();
+        }
+
+        function saveChanges(id) {
+            const textareaData = document.getElementById(`textarea_${id}`).value
+            const contenido_id = document.getElementById(`contenido-${id}`);
+            const modal = document.getElementById(`modal_edit_post_${id}`);
+            fetch(`/editPost/${id}`, {
+                method: "POST",
+                headers: {"Content-type": "application/json", "X-CSRFToken": getCookie("csrftoken")},
+                body: JSON.stringify({
+                    content: textareaData
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+               contenido_id.innerHTML = result.data;
+               
+               modal.classList.remove('show');
+               modal.setAttribute('aria-hidden', 'true');
+               modal.setAttribute('style', 'display: none');
+
+               const modalsBackdrops = document.getElementsByClassName('modal-backdrop');
+
+               for(let i=0; i<modalsBackdrops.length; i++) {
+                document.body.removeChild(modalsBackdrops[i])
+               }
+            })
+        }
+
+        function likeFunction(id, yourLike) {
+            const button = document.getElementById(`${id}`);
+            const likeCountElement = document.getElementById(`like-count-${id}`);
+
+            if (yourLike.indexOf(id) >= 0) {
+                // Ya le diste "like", entonces debes eliminarlo
+                fetch(`/unlike/${id}`)
+                .then(response => response.json())
+                .then(response => {
+                    button.classList.add('fa-thumbs-down');
+                    button.classList.remove('fa-thumbs-up');
+                    const newLikes = response.likes;
+                    likeCountElement.textContent = newLikes;
+                    yourLike.splice(yourLike.indexOf(id), 1);
+                });
+            } else {
+                // No le diste "like", entonces debes darle "like"
+                fetch(`/give_like/${id}`)
+                .then(response => response.json())
+                .then(response => {
+                    button.classList.add('fa-thumbs-up');
+                    button.classList.remove('fa-thumbs-down');
+                    const newLikes = response.likes;
+                    likeCountElement.textContent = newLikes;
+                    yourLike.push(id); 
+                });
+            }
+        }
+    </script>
+
+    <h1 class="my-3 mx-5">All Posts</h1>
+    {% if user.is_authenticated %}
+        <div class="newpost my-3 mx-5">
+           <h2>New Post</h2>
+            <form action="{% url 'newPost' %}" method="post">
+                {% csrf_token %}
+                <textarea name="content" row="4" cols="50"></textarea>
+                <br>
+                <input type="submit" value="Post" class="btn btn-primary"/>
+            </form>
+        </div>
+    {% endif %}
+
+    <div class="posts my-3 mx-5">
+        {% for post in posts_on_page %}
+            <div class="row info-post">
+                <h6 class="username"><a href="{% url 'profile_page' user_id=post.usuario.id %}">@{{ post.usuario }}</a></h6>
+                <h6 class="content my-1 mx-1" id="contenido-{{ post.id }}">{{ post.contenido }}</h6>
+                <p class="date my-1 mx-1">{{ post.date }}</p>
+                <span id="like-count-{{ post.id }}"><strong><h6>{{ post.likes }} Likes</h6></strong></span>
+                {% if user.is_authenticated %}
+                    {% if user == post.usuario %}
+                        <div class="d-flex justify-content-aroud">
+                            <button class="btn btn-outline-secondary my-1 mx-1" data-toggle="modal" data-target="#modal_edit_post_{{ post.id }}">Edit</button>
+                        </div>
+                        <div class="modal" id="modal_edit_post_{{ post.id }}" tabindex="-1" role="dialog" aria-labelledby="modal_edit_post_{{ post.id }}_label" aria-hidden="true">
+                            <div class="modal-dialog" role="document">
+                                <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Edit Post</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <textarea rows="3" id="textarea_{{ post.id }}" class="form-control" name="content">{{ post.contenido }}</textarea>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-primary" onclick="saveChanges({{ post.id }})">Save changes</button>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        {% if post.id in yourLike %} <!-- like is there -->
+                        <button class="btn btn-outline-danger fa fa-thumbs-up col-1 my-1 mx-1" onclick="likeFunction({{ post.id }}, {{ yourLike }})" id="{{ post.id }}"></button>
+                        {% else %}
+                        <button class="btn btn-outline-danger fa fa-thumbs-down col-1 my-1 mx-1" onclick="likeFunction({{ post.id }}, {{ yourLike }})" id="{{ post.id }}"></button>
+                        {% endif %} 
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <nav aria-label="Page navigation example">
+        <ul class="pagination d-flex justify-content-center">
+            {% if posts_on_page.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ posts_on_page.previous_page_number }}">Previous</a></li>
+            {% endif %}
+            {% if posts_on_page.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ posts_on_page.next_page_number }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endblock %}

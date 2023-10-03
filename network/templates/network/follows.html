@@ -1,0 +1,65 @@
+{% extends "network/layout.html" %}
+
+{% block body %}
+<script>
+    function likeFunction(id, yourLike) {
+            const button = document.getElementById(`${id}`);
+            const likeCountElement = document.getElementById(`like-count-${id}`);
+
+            if (yourLike.indexOf(id) >= 0) {
+                // Ya le diste "like", entonces debes eliminarlo
+                fetch(`/unlike/${id}`)
+                .then(response => response.json())
+                .then(response => {
+                    button.classList.add('fa-thumbs-down');
+                    button.classList.remove('fa-thumbs-up');
+                    const newLikes = response.likes;
+                    likeCountElement.textContent = newLikes;
+                    yourLike.splice(yourLike.indexOf(id), 1);
+                });
+            } else {
+                // No le diste "like", entonces debes darle "like"
+                fetch(`/give_like/${id}`)
+                .then(response => response.json())
+                .then(response => {
+                    button.classList.add('fa-thumbs-up');
+                    button.classList.remove('fa-thumbs-down');
+                    const newLikes = response.likes;
+                    likeCountElement.textContent = newLikes;
+                    yourLike.push(id); 
+                });
+            }
+        }
+</script>
+
+<h1 class="my-3 mx-5">Your follows</h1>
+
+    <div class="posts my-3 mx-5">
+        {% for post in posts_on_page %}
+            <div class="row info-post">
+                <h6 class="username"><a href="{% url 'profile_page' user_id=post.usuario.id %}">@{{ post.usuario }}</a></h6>
+                <h6 class="content">{{ post.contenido }}</h6>
+                <p class="date">{{ post.date }}</p>
+                <span id="like-count-{{ post.id }}"><strong><h6>{{ post.likes }} Likes</h6></strong></span>
+                {% if user.is_authenticated %}
+                    {% if post.id in yourLike %} <!-- if like is there already -->
+                    <button class="btn btn-outline-danger fa fa-thumbs-up col-1 my-1 mx-1" onclick="likeFunction({{ post.id }}, {{ yourLike }})" id="{{ post.id }}"></button>
+                    {% else %}
+                    <button class="btn btn-outline-danger fa fa-thumbs-down col-1 my-1 mx-1" onclick="likeFunction({{ post.id }}, {{ yourLike }})" id="{{ post.id }}"></button>                      
+                    {% endif %}            
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <nav aria-label="Page navigation example">
+        <ul class="pagination d-flex justify-content-center">
+            {% if posts_on_page.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ posts_on_page.previous_page_number }}">Previous</a></li>
+            {% endif %}
+            {% if posts_on_page.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ posts_on_page.next_page_number }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endblock %}
